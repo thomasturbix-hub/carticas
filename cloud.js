@@ -94,6 +94,25 @@
     return true;
   };
 
+  /**
+   * Importar progreso: sube YA meta y partida locales, sin fusionar con lo de la nube (lo importado la sustituye).
+   * Si la nube aún está conectando, espera a que termine (máx. 5 s). Devuelve true si se escribió.
+   */
+  Cloud.pushNow = async function () {
+    for (let i = 0; i < 25 && Cloud.state === 'connecting'; i++) await new Promise((r) => setTimeout(r, 200));
+    if (Cloud.state !== 'cloud' || !col) return false;
+    clearTimeout(timer); timer = null;
+    const m = M.load(Store), r = localRun(), now = new Date().toISOString();
+    setSyncing(true);
+    try {
+      await col.doc('meta').set({ meta: m, savedAt: m.savedAt || now });
+      await col.doc('run').set({ run: r.run, savedAt: r.savedAt || now });
+      lastSent.meta = metaKey(m); lastSent.run = runKey(r); dirty.meta = dirty.run = false;
+      Cloud.pendingRun = null;
+      return true;
+    } catch (e) { return false; } finally { setSyncing(false); }
+  };
+
   /* ---------- Arranque: nunca bloquea el juego ---------- */
   async function init() {
     const c = root.claude;

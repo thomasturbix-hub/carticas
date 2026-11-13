@@ -2626,26 +2626,36 @@
       paintChk(); layer.add(chkHit);
       return { y: wy, toggle };
     };
-    const cWarn = checkbox(py + 322, _t('u.avisar_si_terminas_el_turno'), 'endWarn');
-    const cMotion = checkbox(py + 368, _t('u.reducir_movimiento_sin_temblores_ni'), 'reduceMotion');
-    const cVib = checkbox(py + 414, _t('feel.vibration'), 'vibration');   // vibración del mando (golpes fuertes, daño, jefe)
+    const cWarn = checkbox(py + 318, _t('u.avisar_si_terminas_el_turno'), 'endWarn');
+    const cMotion = checkbox(py + 362, _t('u.reducir_movimiento_sin_temblores_ni'), 'reduceMotion');
+    const cVib = checkbox(py + 406, _t('feel.vibration'), 'vibration');   // vibración del mando (golpes fuertes, daño, jefe)
     // Idioma / Language: botón con el idioma actual que abre el menú
-    const ly = py + 462;
+    const ly = py + 450;
     layer.add(fitLine(T(S, px + 40, ly, _t('lang.title'), { size: TH.size.body, ox: 0, color: C.parch }), 300, TH.size.small));
     const langBtn = button(S, px + PW - 120, ly, I18N.LANG_NAMES[I18N.lang], () => openLangMenu(scene, px + PW - 120, ly + 26), { w: 170, h: TH.button.minH, size: TH.size.small, variant: 'ghost', compact: false });
     layer.add(langBtn);
     // Glosario de habilidades (pestaña «Habilidades» del Compendio, encima de esta pantalla)
-    const gy = py + 514;
+    const gy = py + 494;
     const openGl = () => { close(); const UI = root.CM_UI; if (UI && UI.openGlossary) UI.openGlossary(scene); };
     layer.add(fitLine(T(S, px + 40, gy, _t('gl.open'), { size: TH.size.body, ox: 0, color: C.parch }), 300, TH.size.small));
     const glBtn = button(S, px + PW - 120, gy, _t('gl.openBtn'), openGl, { w: 170, h: TH.button.minH, size: TH.size.small, variant: 'ghost', compact: false });
     layer.add(glBtn);
     // Ver la intro (Parche 3.7): encima de la escena actual, que queda en pausa
-    const iy = py + 566;
+    const iy = py + 538;
     const openIntro = () => { close(); const sc = scene; sc.scene.launch('Intro', { over: sc.scene.key }); sc.scene.pause(sc.scene.key); };
     layer.add(fitLine(T(S, px + 40, iy, _t('intro.watchLong'), { size: TH.size.body, ox: 0, color: C.parch }), 300, TH.size.small));
     const inBtn = button(S, px + PW - 120, iy, _t('intro.watch'), openIntro, { w: 170, h: TH.button.minH, size: TH.size.small, variant: 'ghost', compact: false });
     layer.add(inBtn);
+    // Progreso: exportar / importar (copia en texto para llevarla a otro dispositivo)
+    const pgy = py + 582;
+    const openExp = () => openProgress(scene, 'export'), openImp = () => openProgress(scene, 'import');
+    layer.add(fitLine(T(S, px + 40, pgy, _t('sv.section'), { size: TH.size.body, ox: 0, color: C.parch }), 220, TH.size.small));
+    const pgBtns = [[_t('sv.export'), openExp], [_t('sv.import'), openImp]].map(([lab, fn], i) => {
+      const b = button(S, px + PW - 226 + i * 128, pgy, lab, fn, { w: 120, h: TH.button.minH, size: TH.size.small, variant: 'ghost', compact: false });
+      const lt = b.list && b.list.find((o) => o.type === 'Text'); if (lt) fitText(lt, 108, 0, TH.size.micro);
+      layer.add(b); return b;
+    });
+    let pgSel = 0;
 
     // «?»: atajos de teclado (escritorio)
     const keysLayer = S.add.container(0, 0).setVisible(false);
@@ -2680,7 +2690,7 @@
     const setSpeed = (d) => { const v = Math.max(1, Math.min(3, Opts.speed + d)); if (v !== Opts.speed) { setOpt('speed', v); paintSpeed(); Sfx.synth('click', 1.4); } };
     const rows = [
       { y: sMusic.y, lr: sMusic.adjust }, { y: sSfx.y, lr: sSfx.adjust }, { y: sVoice.y, lr: sVoice.adjust }, { y: sy, lr: setSpeed },
-      { y: cWarn.y, ok: cWarn.toggle }, { y: cMotion.y, ok: cMotion.toggle }, { y: cVib.y, ok: () => { cVib.toggle(); if (Opts.vibration) vibrate(0.5, 120); } }, { y: ly, ok: () => openLangMenu(scene, px + PW - 120, ly + 26) }, { y: gy, ok: openGl }, { y: iy, ok: openIntro }, { y: py + PH - 38, ok: close, btn: true }
+      { y: cWarn.y, ok: cWarn.toggle }, { y: cMotion.y, ok: cMotion.toggle }, { y: cVib.y, ok: () => { cVib.toggle(); if (Opts.vibration) vibrate(0.5, 120); } }, { y: ly, ok: () => openLangMenu(scene, px + PW - 120, ly + 26) }, { y: gy, ok: openGl }, { y: iy, ok: openIntro }, { y: pgy, ok: () => (pgSel ? openImp : openExp)(), lr: (d) => { pgSel = d > 0 ? 1 : 0; }, pair: pgBtns }, { y: py + PH - 38, ok: close, btn: true }
     ];
     let row = rows.length - 1;
     const ring = S.add.graphics(); layer.add(ring);
@@ -2690,7 +2700,8 @@
       if (Input.device === 'mouse') return;
       const r = rows[row];
       ring.lineStyle(TH.borderWidth, TH.color.ember, 1);   // foco: ember 2 px
-      if (r.btn) ring.strokeRoundedRect(640 - 86, r.y - 28, 172, 56, TH.radius + 2); else ring.strokeRoundedRect(px + 24, r.y - 26, PW - 48, 52, TH.radius + 2);
+      if (r.btn) ring.strokeRoundedRect(640 - 86, r.y - 28, 172, 56, TH.radius + 2); else ring.strokeRoundedRect(px + 24, r.y - 24, PW - 48, 48, TH.radius + 2);
+      if (r.pair) { const pb = r.pair[pgSel]; ring.lineStyle(TH.borderWidth, C.gold, 1); ring.strokeRoundedRect(pb.x - 64, r.y - 27, 128, 54, TH.radius + 2); }   // botón elegido (←/→)
       if (Input.device === 'pad' && r.ok) padGlyph(glyph, r.btn ? 640 - 92 : px + 26, r.y - 24, 'A', 11);
     };
     paintRow();
@@ -2702,7 +2713,7 @@
       else if ((a === 'left' || a === 'right') && r.lr) r.lr(a === 'left' ? -1 : 1);
       else if (a === 'confirm') { if (r.ok) r.ok(); }
       else if (a === 'back') { close(); }
-      if (scene._settingsOpen) paintRow();
+      if (scene._settingsOpen && layer.scene) paintRow();   // (si la acción abrió otro panel, este ya no existe)
       return true;
     };
     blocker.on('pointerup', (p) => { if (p.x < px || p.x > px + PW || p.y < py || p.y > py + PH) close(); });   // clic fuera = cerrar
@@ -2713,6 +2724,266 @@
     if (S.input.keyboard) S.input.keyboard.on('keydown', onKey);
     scene.events.once('shutdown', () => { scene._settingsOpen = false; });
     return { close };
+  }
+
+  /* =================================================================
+   * Progreso: exportar / importar (savecode.js · «CMSAVE1:…»)
+   *   Panel encima de Ajustes; el código vive en un <textarea> HTML superpuesto al lienzo
+   *   (en el móvil se puede pegar con el menú del sistema). Mando: ←/→/↑/↓ entre botones, A pulsa, B vuelve.
+   * ================================================================= */
+  const SAVE_ERR = { empty: 'sv.err.empty', format: 'sv.err.format', corrupt: 'sv.err.corrupt', version: 'sv.err.version', unsupported: 'sv.err.unsupported' };
+  const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
+  /** «Esencia 1.155 · 15 partidas · Afinidad Piromago 7 · partida a medias: Acto II» */
+  function saveSummaryText(sm) {
+    const parts = [_t('sv.sumEss', { n: I18N.score(sm.essence) }), _t('sv.sumRuns', { n: I18N.score(sm.played) })];
+    if (sm.aff) parts.push(_t('sv.sumAff', { c: sm.aff.name, n: sm.aff.level }));
+    if (sm.run) parts.push(_t('sv.sumRun', { a: ROMAN[sm.run] || sm.run }));
+    if (sm.custom) parts.push(_t('sv.sumCustom', { a: ROMAN[sm.custom] || sm.custom }));
+    if (!sm.run && !sm.custom) parts.push(_t('sv.sumNoRun'));
+    return parts.join(' · ');
+  }
+  const fmtSaveDate = (iso) => { try { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(I18N.locale(), { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } };
+  /** <textarea> HTML colocado sobre el lienzo en coordenadas del juego (1280×720); sigue al lienzo al redimensionar. */
+  function overlayTextarea(S, x, y, w, h, o = {}) {
+    const doc = root.document, canvas = S.sys.game.canvas;
+    if (!doc || !canvas) return null;
+    const ta = doc.createElement('textarea');
+    ta.readOnly = !!o.readOnly; ta.placeholder = o.placeholder || ''; ta.value = o.value || '';
+    ta.spellcheck = false;
+    ['autocapitalize', 'autocomplete', 'autocorrect'].forEach((a) => ta.setAttribute(a, 'off'));
+    ta.setAttribute('aria-label', o.label || '');
+    ta.className = 'cm-save-code';
+    ta.style.cssText = 'position:fixed;z-index:60;box-sizing:border-box;margin:0;padding:8px 10px;resize:none;outline:none;'
+      + `border:2px solid ${hex(C.gold)};border-radius:8px;background:rgba(12,16,14,.97);color:${hex(C.parch)};`
+      + `font-family:${F.mono};line-height:1.3;word-break:break-all;overflow-wrap:anywhere;white-space:pre-wrap;overflow-y:auto;-webkit-user-select:text;user-select:text`;
+    // Lo que se escribe aquí no llega al juego (Phaser escucha el teclado en window: Enter/Esc/E no deben dispararse)
+    const stop = (e) => e.stopPropagation();
+    ['keydown', 'keyup', 'keypress'].forEach((ev) => ta.addEventListener(ev, stop));
+    doc.body.appendChild(ta);
+    const place = () => {
+      const r = canvas.getBoundingClientRect(), k = r.width / 1280;
+      Object.assign(ta.style, { left: `${r.left + x * k}px`, top: `${r.top + y * k}px`, width: `${w * k}px`, height: `${h * k}px`,
+        fontSize: `${Math.max(o.readOnly ? 11 : 16, Math.round(15 * k))}px` });   // 16 px al escribir: iOS no hace zoom
+    };
+    place();
+    const onR = () => place();
+    root.addEventListener('resize', onR); S.scale.on('resize', onR);
+    return {
+      el: ta, place,
+      show(v) { ta.style.display = v ? '' : 'none'; if (v) place(); },
+      destroy() { root.removeEventListener('resize', onR); S.scale.off('resize', onR); ta.remove(); }
+    };
+  }
+  /** Abre «Exportar progreso» (mode 'export') o «Importar progreso» ('import'). Al volver, reabre Ajustes. */
+  function openProgress(scene, mode = 'export') {
+    const SC = root.CM_SAVE;
+    if (!SC) return null;
+    if (scene._settingsOpen && scene._settingsClose) scene._settingsClose();
+    scene._settingsOpen = true;
+    const S = Overlay.S(scene), doc = root.document;
+    const PW = 760, PH = 580, px = 640 - PW / 2, py = 360 - PH / 2, BH = 64;
+    const layer = S.add.container(0, 0).setDepth(LAYER.modal).setScrollFactor(0);
+    const blocker = S.add.zone(0, 0, 1280, 720).setOrigin(0, 0).setInteractive();
+    const dim = S.add.rectangle(640, 360, 1280, 720, TH.color.shade, TH.alpha.curtain);
+    const g = S.add.graphics();
+    g.fillStyle(TH.color.shade, TH.alpha.shadow); g.fillRoundedRect(px + 4, py + 8, PW, PH, TH.radius);
+    root.CM_Panel.draw(g, px, py, PW, PH);
+    const ring = S.add.graphics(), glyph = S.add.graphics();
+    layer.add([blocker, dim, g, ring, glyph]);
+    Overlay.own(scene, layer); Overlay.addModal(layer);
+
+    const api = { state: mode, code: '', payload: null, busy: false, status: '', statusKind: '' };
+    let body = null, btns = [], sel = 0, statusT = null, closed = false;
+    const tas = {};   // export / import: un cuadro por pantalla (lo pegado se conserva al cancelar)
+    const taOf = (kind) => {
+      if (tas[kind]) return tas[kind];
+      tas[kind] = kind === 'export'
+        ? overlayTextarea(S, px + 40, py + 156, PW - 80, 190, { readOnly: true, value: _t('sv.building'), label: _t('sv.exportTitle') })
+        : overlayTextarea(S, px + 40, py + 122, PW - 80, 200, { placeholder: _t('sv.placeholder'), label: _t('sv.importTitle') });
+      return tas[kind];
+    };
+    const setStatus = (msg, kind = '') => {
+      api.status = msg || ''; api.statusKind = kind;
+      if (statusT && statusT.active) statusT.setText(api.status).setColor(hex(kind === 'err' ? C.blood : kind === 'ok' ? C.leaf : C.muted));
+    };
+    const close = (back = true) => {
+      if (closed) return;
+      closed = true;
+      Object.values(tas).forEach((t) => t && t.destroy());
+      scene._settingsOpen = false; scene._settingsNav = null; scene._settingsClose = null; scene._progress = null;
+      if (S.input.keyboard) S.input.keyboard.off('keydown', onKey);
+      layer.destroy();
+      if (!back) return;
+      // Ajustes vuelve en el siguiente instante: la misma tecla/botón (Esc, B) no debe cerrarlo también
+      scene._settingsOpen = true; scene._settingsNav = () => true;
+      root.setTimeout(() => {
+        if (scene._settingsNav && scene._settingsClose == null) { scene._settingsOpen = false; scene._settingsNav = null; }
+        if (scene.sys.isActive() && !scene._settingsOpen) openSettings(scene);
+      }, 30);
+    };
+    const press = (b) => { if (!api.busy && b && b.press) b.press(); };
+
+    /* ----- acciones ----- */
+    const copy = async () => {
+      if (!api.code) return;
+      let ok = false;
+      try { if (root.navigator && root.navigator.clipboard) { await root.navigator.clipboard.writeText(api.code); ok = true; } } catch (e) { /* sin permiso: plan B */ }
+      if (!ok) {
+        try { const el = tas.export.el; el.focus(); el.select(); el.setSelectionRange(0, el.value.length); ok = !!doc.execCommand('copy'); } catch (e) { ok = false; }
+      }
+      setStatus(ok ? _t('sv.copied') : _t('sv.copyFail'), ok ? 'ok' : 'err');
+      Sfx.synth('click', 1.4);
+    };
+    const download = () => {
+      if (!api.code) return;
+      const name = SC.fileName();
+      try {
+        const text = `${_t('sv.fileHeader', { d: fmtSaveDate(new Date().toISOString()) })}\n\n${api.code}\n`;
+        const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+        const a = doc.createElement('a'); a.href = url; a.download = name; a.style.display = 'none';
+        doc.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        setStatus(_t('sv.downloaded', { f: name }), 'ok');
+      } catch (e) { setStatus(_t('sv.downloadFail'), 'err'); }
+      Sfx.synth('click', 1.4);
+    };
+    const check = async (text) => {
+      const r = await SC.decode(text !== undefined ? text : (tas.import ? tas.import.el.value : ''));
+      if (closed) return r;
+      if (!r.ok) { setStatus(_t(SAVE_ERR[r.err] || 'sv.err.corrupt'), 'err'); Sfx.play('click', { volume: 0.4 }); return r; }
+      api.payload = r.payload; go('confirm');
+      return r;
+    };
+    const onFile = (inp) => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      if (f.size > 4e6) { setStatus(_t('sv.err.format'), 'err'); return; }
+      const rd = new root.FileReader();
+      rd.onload = () => { if (closed) return; const txt = String(rd.result || ''); if (tas.import) tas.import.el.value = txt.trim(); setStatus(_t('sv.fileRead', { f: f.name }), 'ok'); check(txt); };
+      rd.onerror = () => setStatus(_t('sv.fileFail'), 'err');
+      rd.readAsText(f);
+      inp.value = '';   // el mismo archivo otra vez también avisa
+    };
+    /**
+     * «Cargar archivo»: un <input type=file> invisible encima del botón. El toque/clic llega directo al navegador
+     * (Safari y Chrome solo abren el selector desde un gesto real); con mando/teclado se abre con .click().
+     */
+    let fileEl = null, fileTap = 0;
+    const fileInput = (b) => {
+      if (!doc || fileEl) return fileEl;
+      const inp = doc.createElement('input');
+      inp.type = 'file'; inp.accept = '.txt,text/plain'; inp.className = 'cm-save-file'; inp.title = _t('sv.loadFile');
+      inp.style.cssText = 'position:fixed;z-index:61;opacity:0;cursor:pointer;margin:0;padding:0;font-size:0';
+      inp.addEventListener('change', () => onFile(inp));
+      inp.addEventListener('pointerdown', () => { fileTap = Date.now(); });
+      inp.addEventListener('click', () => Sfx.synth('click', 1.4));
+      doc.body.appendChild(inp);
+      const place = () => {
+        const r = S.sys.game.canvas.getBoundingClientRect(), k = r.width / 1280;
+        Object.assign(inp.style, { left: `${r.left + (b.x - b._w / 2) * k}px`, top: `${r.top + (b.y - BH / 2) * k}px`, width: `${b._w * k}px`, height: `${BH * k}px` });
+      };
+      place();
+      const onR = () => place();
+      root.addEventListener('resize', onR); S.scale.on('resize', onR);
+      fileEl = { el: inp, show(v) { inp.style.display = v ? '' : 'none'; if (v) place(); }, destroy() { root.removeEventListener('resize', onR); S.scale.off('resize', onR); inp.remove(); } };
+      tas.file = fileEl;
+      return fileEl;
+    };
+    // (Phaser también ve ese mismo clic a través de window: si vino del <input>, el selector ya se está abriendo)
+    const pickFile = () => { if (fileEl && Date.now() - fileTap > 800) { api.fileInput = fileEl.el; fileEl.el.click(); } };
+    const accept = async () => {
+      if (api.busy) return;
+      api.busy = true; setStatus(_t('sv.applying'));
+      try {
+        if (api.state === 'confirmUndo') await SC.undo(); else await SC.apply(api.payload);
+        api.applied = true;
+      } catch (e) { api.busy = false; setStatus(_t('sv.err.corrupt'), 'err'); }
+    };
+
+    /* ----- pantallas ----- */
+    const mkBtn = (x, y, w, label, fn, variant = 'ghost') => {
+      const b = button(S, x, y, label, fn, { w, h: BH, size: TH.size.body, variant, compact: false });
+      const lt = b.list && b.list.find((o) => o.type === 'Text'); if (lt) fitText(lt, w - 24, 0, TH.size.small);
+      b._w = w; body.add(b); btns.push(b); return b;
+    };
+    const go = (state) => { api.state = state; render(); };
+    function render() {
+      if (body) body.destroy();
+      body = S.add.container(0, 0); layer.add(body); layer.bringToTop(ring); layer.bringToTop(glyph);
+      btns = []; sel = 0;
+      const st = api.state, add = (o) => { body.add(o); return o; };
+      const titleKey = { export: 'sv.exportTitle', import: 'sv.importTitle', confirm: 'sv.confirmTitle', confirmUndo: 'sv.undoTitle' }[st];
+      add(fitLine(T(S, 640, py + 40, _t(titleKey), { size: TH.size.h2, bold: true, color: C.gold }), PW - 60));
+      Object.keys(tas).forEach((k) => tas[k].show(k === st || (k === 'file' && st === 'import')));
+      if (st === 'export') {
+        add(fitText(T(S, 640, py + 86, _t('sv.exportHelp'), { size: TH.size.small, color: C.parch, wrap: PW - 80, align: 'center' }), PW - 80, 46, TH.size.micro));
+        const sm = SC.summary({ data: SC.collect(), at: '' });
+        add(fitText(T(S, 640, py + 132, saveSummaryText(sm), { size: TH.size.small, bold: true, color: C.gold, wrap: PW - 80, align: 'center' }), PW - 80, 40, TH.size.micro));
+        const ta = taOf('export'); ta.show(true);
+        statusT = add(fitLine(T(S, 640, py + 374, '', { size: TH.size.small, bold: true, color: C.muted }), PW - 60, TH.size.micro));
+        mkBtn(640 - 180, py + 436, 330, _t('sv.copy'), copy, 'primary');
+        mkBtn(640 + 180, py + 436, 330, _t('sv.download'), download, 'secondary');
+        mkBtn(640, py + PH - 50, 220, _t('sv.back'), () => close(true), 'ghost');
+        if (!api.code) {
+          SC.encode(SC.collect()).then((code) => { api.code = code; if (tas.export) tas.export.el.value = code; }).catch(() => setStatus(_t('sv.err.unsupported'), 'err'));
+        }
+      } else if (st === 'import') {
+        add(fitText(T(S, 640, py + 86, _t('sv.importHelp'), { size: TH.size.small, color: C.parch, wrap: PW - 80, align: 'center' }), PW - 80, 46, TH.size.micro));
+        taOf('import').show(true);
+        statusT = add(fitText(T(S, 640, py + 350, '', { size: TH.size.small, bold: true, color: C.muted, wrap: PW - 60, align: 'center' }), PW - 60, 44, TH.size.micro));
+        fileInput(mkBtn(640 - 180, py + 420, 330, _t('sv.loadFile'), pickFile, 'secondary')).show(true);
+        mkBtn(640 + 180, py + 420, 330, _t('sv.import'), () => check(), 'primary');
+        if (SC.hasUndo()) {
+          mkBtn(640 - 180, py + PH - 50, 330, _t('sv.undo'), () => go('confirmUndo'), 'ghost');
+          mkBtn(640 + 180, py + PH - 50, 330, _t('sv.back'), () => close(true), 'ghost');
+        } else mkBtn(640, py + PH - 50, 220, _t('sv.back'), () => close(true), 'ghost');
+        sel = 1;
+      } else {
+        const undo = st === 'confirmUndo';
+        const data = undo ? SC.undoData() : api.payload.data;
+        const sm = SC.summary({ data: data || {}, at: undo ? '' : api.payload.at });
+        if (sm.at && fmtSaveDate(sm.at)) add(fitLine(T(S, 640, py + 96, _t('sv.sumAt', { d: fmtSaveDate(sm.at) }), { size: TH.size.small, color: C.muted }), PW - 80));
+        add(fitText(T(S, 640, py + 190, saveSummaryText(sm), { size: TH.size.h3, bold: true, color: C.parch, wrap: PW - 100, align: 'center', lineSpacing: 4 }), PW - 100, 150, TH.size.small));
+        add(fitText(T(S, 640, py + 330, _t(undo ? 'sv.undoWarn' : 'sv.confirmWarn'), { size: TH.size.body, bold: true, color: C.ember, wrap: PW - 100, align: 'center' }), PW - 100, 60, TH.size.small));
+        statusT = add(fitLine(T(S, 640, py + 392, '', { size: TH.size.small, bold: true, color: C.muted }), PW - 60, TH.size.micro));
+        mkBtn(640 - 180, py + PH - 70, 300, _t('sv.cancel'), () => { setStatus(''); go('import'); }, 'ghost');
+        mkBtn(640 + 180, py + PH - 70, 300, _t('sv.accept'), accept, 'primary');
+      }
+      setStatus(api.status && st !== 'confirm' && st !== 'confirmUndo' ? api.status : '', api.statusKind);
+      paintRing();
+    }
+    function paintRing() {
+      ring.clear(); glyph.clear();
+      if (Input.device === 'mouse' || !btns[sel]) return;
+      const b = btns[sel];
+      ring.lineStyle(TH.borderWidth, TH.color.ember, 1);
+      ring.strokeRoundedRect(b.x - b._w / 2 - 6, b.y - BH / 2 - 6, b._w + 12, BH + 12, TH.radius + 2);
+      if (Input.device === 'pad') padGlyph(glyph, b.x - b._w / 2 - 8, b.y - BH / 2 - 8, 'A', 11);
+    }
+    /* ----- mando y teclado ----- */
+    let last = { a: '', t: 0 };
+    const nav = (a) => {
+      const now = Date.now();
+      if (a === last.a && now - last.t < 60) return true;   // la misma tecla llega por dos caminos: una sola vez
+      last = { a, t: now };
+      if (api.busy) return true;
+      if (['up', 'left', 'prev', 'tabPrev'].includes(a)) { sel = (sel - 1 + btns.length) % btns.length; Sfx.play('click', { volume: 0.4 }); }
+      else if (['down', 'right', 'next', 'tabNext'].includes(a)) { sel = (sel + 1) % btns.length; Sfx.play('click', { volume: 0.4 }); }
+      else if (a === 'confirm') press(btns[sel]);
+      else if (a === 'back') { if (api.state === 'confirm' || api.state === 'confirmUndo') go('import'); else close(true); }
+      if (!closed) paintRing();
+      return true;
+    };
+    const onKey = (ev) => { if (ev.key === 'Escape') nav('back'); else if (ev.key === 'Enter') nav('confirm'); };
+    if (S.input.keyboard) S.input.keyboard.on('keydown', onKey);
+    scene._settingsNav = nav;
+    scene._settingsClose = () => close(false);
+    blocker.on('pointerup', (p) => { if (!api.busy && (p.x < px || p.x > px + PW || p.y < py || p.y > py + PH)) close(true); });
+    scene.events.once('shutdown', () => { if (!closed) { closed = true; Object.values(tas).forEach((t) => t && t.destroy()); scene._settingsOpen = false; scene._progress = null; } });
+    Object.assign(api, { close, check, copy, download, pickFile, accept, nav, go, textarea: (k) => tas[k] && tas[k].el, buttons: () => btns, layer });
+    scene._progress = api;
+    render();
+    return api;
   }
 
   /* =================================================================
@@ -3367,7 +3638,7 @@
   }
 
   root.CM_UI = {
-    C, F, TH, FRAME_IDS, sceneBackdrop, cardSnapshot, ICON_FILES, ICON_BASE, icK, InlineIcons, INLINE, hex, T, codeShow, fitText, fitLine, Pool, vibrate, upgradeDiff, upgradeCompare, tw, wait, Store, saveRun, loadRun, saveKeyOf, SAVE_KEY, CUSTOM_SAVE_KEY, RUN_AT_KEY, textBox, copyOrShow, drawFlask, flyPotion, potionBreak, openPotionMenu: potionMenu, Sfx, Music, ambientLoop, Vol, openSettings, gearButton, langButton, openLangMenu, changeLang, SFX_FILES, MUSIC_FILES,
+    C, F, TH, FRAME_IDS, sceneBackdrop, cardSnapshot, ICON_FILES, ICON_BASE, icK, InlineIcons, INLINE, hex, T, codeShow, fitText, fitLine, Pool, vibrate, upgradeDiff, upgradeCompare, tw, wait, Store, saveRun, loadRun, saveKeyOf, SAVE_KEY, CUSTOM_SAVE_KEY, RUN_AT_KEY, textBox, copyOrShow, drawFlask, flyPotion, potionBreak, openPotionMenu: potionMenu, Sfx, Music, ambientLoop, Vol, openSettings, openProgress, saveSummaryText, gearButton, langButton, openLangMenu, changeLang, SFX_FILES, MUSIC_FILES,
     makeTextures, backdrop, fireflies, snowfall, heightScale, tooltip, TIP_DELAY, gloss, glossName, glossDesc, glossFind, keywordIds, button, cardView, CARD_W, CARD_H, get KEYWORDS() { return keywordsNow(); }, kwTerm, kwDesc, keywordTips, keywordLine, hasKeyword, glossary,
     hpBar, floatText, popNumber, burst, Fx, banner, toast, questToast, Look, lookColor, cardBackKey, hud, TYPE_COLOR, TYPE_LABEL, cardColor, contractTipText, contractRewardText,
     essenceGem, Live, LAYER, Overlay, overlay: Overlay, scanScreen, placeBubble, backdropOf, graphicsBox, tipBubble, tips, tipOpen, Input, focusManager, buttonsAsFocus, padGlyph, padNav, RUNE_COL, Opts, setOpt, cycleSpeed, get SHORTCUTS() { return shortcuts(); }

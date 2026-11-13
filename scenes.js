@@ -48,7 +48,8 @@
   /** 1840 → "1.840" / "1,840" (siempre agrupado). */
   const fmtScore = (n) => I18N.score(n);
 
-  const QUEST_OPEN_KEY = 'cm_quests_open';   // panel de misiones del título abierto (1) o plegado (0)
+  const QUEST_OPEN_KEY = 'cm_quests_open';
+  const SAVE_WARN_KEY = 'cm_localwarn';      // aviso «tu progreso se guarda en este dispositivo» ya cerrado (savecode.js no lo exporta)   // panel de misiones del título abierto (1) o plegado (0)
   const ESS_C = U.TH.game.essence;            // Esencia Arcana (texto); sin violeta en la interfaz
   /* ---------- Sistema visual (src/ui/theme.js): tokens y componentes; nada de valores sueltos ---------- */
   const TH = U.TH, SZ = TH.size, DUR = TH.dur, TC = TH.color, SP = TH.space, Panel = root.CM_Panel;
@@ -498,6 +499,27 @@
       });
       this.events.once('shutdown', off);
     }
+    /**
+     * Fuera de claude.ai (móvil, .exe, web) no hay nube: la primera vez, un aviso pequeño arriba para hacer una copia.
+     * Se cierra con ✕ (o con el mando) y no vuelve a salir.
+     */
+    localWarn(Cloud) {
+      this.localWarnObjs = null;
+      const inClaude = !!(root.claude && typeof root.claude.use === 'function');
+      if (inClaude || (Cloud && Cloud.state !== 'local') || U.Store.get(SAVE_WARN_KEY)) return;
+      const W = 660, H = 58, x0 = 640 - W / 2, y0 = 8;
+      const g = this.add.graphics().setDepth(LY.units + 6);
+      Panel.draw(g, x0, y0, W, H, { alpha: 0.95 });
+      const ic = this.add.image(x0 + 26, y0 + H / 2, 'ic_disk').setIconScale(0.3).setDepth(LY.units + 7);
+      const t = U.fitText(T(this, x0 + 48, y0 + H / 2, _t('sv.localWarn'), { size: SZ.small, ox: 0, color: C.parch, wrap: W - 120, lineSpacing: -2 }), W - 120, H - 8, SZ.micro).setDepth(LY.units + 7);
+      const x = button(this, x0 + W - 30, y0 + H / 2, '✕', () => {
+        U.Store.set(SAVE_WARN_KEY, '1');
+        Sfx.play('click');
+        this.scene.restart();   // repinta el título sin el aviso (y sin su botón en el foco del mando)
+      }, { w: 44, h: 44, size: SZ.body, variant: 'ghost' });
+      x.setDepth(LY.units + 7); x.noMain = true;
+      this.localWarnObjs = { g, t, x };
+    }
     create() {
       // Nube: si otro dispositivo dejó una partida más reciente, se aplica aquí (nunca en mitad de una partida)
       const Cloud = root.CM_CLOUD;
@@ -518,6 +540,7 @@
       }
       this.input.on('pointerdown', () => Sfx.unlock());
       this.cloudStatus(Cloud);
+      this.localWarn(Cloud);
       // Abanico decorativo con cartas reales del mazo inicial
       const hasSave = !!(U.loadRun() || U.loadRun('custom'));   // con «Continuar», el abanico sube un poco para no quedar tapado
       ['llama', 'piel', 'bola', 'chispa', 'combustion'].forEach((id, i) => {
