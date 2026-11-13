@@ -1,0 +1,112 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Carticas Mágicas</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d1210">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="pwa/apple-touch-icon.png">
+<link rel="icon" href="pwa/icon-192.png">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,700;0,800;1,400&family=Alegreya+SC:wght@500;700&family=Grenze+Gotisch:wght@400;600;700&family=Roboto+Mono:wght@500;700&display=swap">
+<style>
+  /* Juego de un solo mundo visual (noche de bosque): tema oscuro fijo a propósito.
+     Layout: lienzo 16:9 centrado que escala para caber en cualquier pantalla. */
+  :root {
+    --ink: #0d1210;
+    --gold: #e6c066;
+    --parch: #f0e4c8;
+    --muted: #a7a38c;
+    --font-display: "Grenze Gotisch", "Palatino Linotype", Georgia, serif;
+    --font-body: "Alegreya", "Lora", Georgia, serif;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--ink);
+    color: var(--parch);
+    font-family: var(--font-body);
+    overflow: hidden;
+    padding-block: 0;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    box-sizing: border-box;
+  }
+  #game { width: 100%; height: 100%; display: grid; place-items: center; }
+  #game canvas { display: block; outline: none; }
+  #loader { font-family: var(--font-display); font-size: 2.4rem; color: var(--gold); letter-spacing: .02em; text-align: center; }
+  #loader small { display: block; font-family: var(--font-body); font-size: 1rem; color: var(--muted); margin-top: .5rem; }
+  #fatal { max-width: 34rem; text-align: center; line-height: 1.5; }
+</style>
+
+<div id="game"><div id="loader">Carticas Mágicas<small>Encendiendo las brasas…</small></div></div>
+
+<script src="vendor/phaser.min.js"></script>
+<script src="i18n.js"></script>
+<script src="i18n_strings.js"></script>
+<script src="i18n_data_en.js"></script>
+<script src="data.js"></script>
+<script src="engine.js"></script>
+<script src="meta.js"></script>
+<script src="src/ui/theme.js"></script>
+<script src="ui.js"></script>
+<script src="src/ui/UIButton.js"></script>
+<script src="src/ui/Panel.js"></script>
+<script src="src/ui/FocusManager.js"></script>
+<script src="anim.js"></script>
+<script src="feel.js"></script>
+<script src="cloud.js"></script>
+<script src="scenes.js"></script>
+<script>
+  (async function boot() {
+    const root = document.getElementById('game');
+    if (!window.Phaser || !window.CM_SCENES) {
+      root.innerHTML = '<p id="fatal">No se pudo cargar el motor del juego. Recarga la página; si persiste, prueba otro navegador.</p>';
+      return;
+    }
+    // Espera a las fuentes (máx. 2,5 s) para que Phaser mida bien los textos
+    try {
+      await Promise.race([
+        Promise.all([
+          document.fonts.load('40px "Grenze Gotisch"'),
+          document.fonts.load('18px "Alegreya"'),
+          document.fonts.load('bold 18px "Alegreya"'),
+          document.fonts.load('italic 18px "Alegreya"'),
+          document.fonts.load('bold 20px "Roboto Mono"')
+        ]),
+        new Promise((r) => setTimeout(r, 2500))
+      ]);
+    } catch (e) { /* seguimos con las fuentes de respaldo */ }
+    root.innerHTML = '';
+    window.CM_GAME = new Phaser.Game({
+      type: Phaser.AUTO,
+      input: { gamepad: true },   // mando (Xbox / API estándar)
+      parent: 'game',
+      width: 1280,
+      height: 720,
+      backgroundColor: window.CM_THEME.css(window.CM_THEME.color.deep),
+      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+      render: { antialias: true },
+      scene: window.CM_SCENES
+    });
+  })();
+</script>
+
+<script>
+  // Instalable y sin conexión
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  // En el móvil: pantalla completa y horizontal al primer toque (si el navegador lo permite)
+  (function () {
+    const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+    if (!mobile) return;
+    const go = () => {
+      const el = document.documentElement;
+      const p = el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : null;
+      Promise.resolve(p).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape')).catch(() => {});
+      window.removeEventListener('pointerup', go);
+    };
+    if (!matchMedia('(display-mode: fullscreen)').matches) window.addEventListener('pointerup', go);
+  })();
+</script>
+</body></html>
