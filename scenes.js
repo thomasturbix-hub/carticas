@@ -432,7 +432,7 @@
         ctx.fillStyle = gr; ctx.fillRect(0, 0, 128, 128); cv.refresh(); }
       { const g = this.make.graphics({ add: false });   // hoja (muerte de una criatura)
         g.fillStyle(0xffffff, 1); g.fillEllipse(9, 6, 18, 10); g.lineStyle(1.5, 0x000000, 0.25); g.lineBetween(1, 6, 17, 6);
-        g.generateTexture('leafp', 18, 12); g.destroy(); }
+        root.CM_HIRES.genTex(g, 'leafp', 18, 12); g.destroy(); }
       Sfx.attach(this.game);
       const miss = Sfx.missing();
       if (miss.length) console.warn('[Carticas] Audio sin cargar (se usa el sintetizado):', miss.join(', '));
@@ -1432,12 +1432,12 @@
       this.minY = -(H - 720); this.maxY = 0;
       this.setScroll(-(focusY - 470), false);
       this.input.on('wheel', (p, objs, dx, dy) => { if (!U.tipOpen(this)) this.setScroll(world.y - dy * 0.7, false); });
-      this.input.on('pointerdown', (p) => { this.dragY = U.tipOpen(this) ? undefined : p.y; this.dragMoved = false; });
+      this.input.on('pointerdown', (p) => { this.dragY = U.tipOpen(this) ? undefined : p.worldY; this.dragMoved = false; });
       this.input.on('pointermove', (p) => {
         if (!p.isDown || this.dragY === undefined || U.tipOpen(this)) return;
-        const dy = p.y - this.dragY;
+        const dy = p.worldY - this.dragY;
         if (Math.abs(dy) > 4) this.dragMoved = true;
-        if (this.dragMoved) { this.setScroll(world.y + dy, false); this.dragY = p.y; }
+        if (this.dragMoved) { this.setScroll(world.y + dy, false); this.dragY = p.worldY; }
       });
       this.input.on('pointerup', () => { this.dragY = undefined; });
 
@@ -2558,7 +2558,7 @@
     }
 
     buildInput() {
-      this.input.dragDistanceThreshold = 10;
+      this.input.dragDistanceThreshold = Math.round(10 * root.CM_HIRES.R);   // (en píxeles del lienzo: 10 lógicos)
       this.input.on('dragstart', (p, obj) => {
         if (this.busy || !obj.cardData) return;
         this.dragging = obj; this.wasDrag = true;
@@ -2858,7 +2858,7 @@
       // Elevada: inclinación «3D» sutil hacia el cursor (giro de hasta ~6° y escala X/Y que simula el tilt)
       obj.on('pointermove', (p) => {
         if (!obj.hovered || this.dragging || p.wasTouch || U.Opts.reduceMotion) return;
-        const kx = Phaser.Math.Clamp((p.x - obj.x) / (U.CARD_W * 0.6), -1, 1), ky = Phaser.Math.Clamp((p.y - obj.y) / (U.CARD_H * 0.6), -1, 1);
+        const kx = Phaser.Math.Clamp((p.worldX - obj.x) / (U.CARD_W * 0.6), -1, 1), ky = Phaser.Math.Clamp((p.worldY - obj.y) / (U.CARD_H * 0.6), -1, 1);
         if (this.tweens.isTweening(obj)) return;   // mientras sube, manda su tween
         obj.rotation = kx * 0.1;
         obj.setScale(HAND.hoverScale * handK() * (1 - Math.abs(kx) * 0.05), HAND.hoverScale * handK() * (1 - Math.abs(ky) * 0.04));
@@ -2941,7 +2941,7 @@
       for (const o of this.cards.values()) {
         if (!o.hovered || this.selected === o.cardData.uid || o === padObj || o === this.dragging) continue;
         const b = o.getBounds();
-        if (!(U.Input.device === 'mouse' && b.contains(p.x, p.y))) { o.hovered = false; changed = true; }
+        if (!(U.Input.device === 'mouse' && b.contains(p.worldX, p.worldY))) { o.hovered = false; changed = true; }
       }
       if (changed) {
         hideGloss(this);
@@ -3860,12 +3860,12 @@
           this.enemy.setTintFill(0xffffff); this.enemy.setAlpha(0.95);
           setTimeout(() => { if (this.enemy && this.enemy.scene) this.enemy.setTintFill(dom); }, 60);
           const cam = this.cameras.main;
-          if (!rm) cam.zoomTo(boss ? 1.08 : 1.05, 260 / sp, 'Quad.easeOut');
+          if (!rm) root.CM_HIRES.camTo(cam, { f: boss ? 1.08 : 1.05, duration: 260 / sp, ease: 'Quad.easeOut' });   // zoom sobre la base R
           U.Fx.death(this, this.enemy.getBounds(), boss ? 70 : 46, dom, dom2);
           burst(this, this.eX, this.eY, dom2, 24, 120);
           this.tweens.add({ targets: this.enemyShadow, alpha: 0, duration: 700 });
           await tw(this, { targets: this.enemy, alpha: 0, scaleY: this.enemyBaseScale * 1.08, y: this.enemy.y - 14, duration: 900, delay: 120, ease: 'Sine.in' });
-          if (!rm) cam.zoomTo(1, 320 / U.Opts.speed, 'Quad.easeInOut');
+          if (!rm) root.CM_HIRES.camReset(cam, 320 / U.Opts.speed, 'Quad.easeInOut');
           return;
         }
         case 'enemyDie': {   // grupos: muere uno y el combate sigue (las animaciones de los demás no se cortan)
@@ -5815,8 +5815,8 @@
       const minY = Math.min(0, 620 - (y0 + (rows - 1) * ch + ch / 2));
       const scrollTo = (v) => { content.y = Phaser.Math.Clamp(v, minY, 0); };
       this.input.on('wheel', (p, o, dx, dy) => scrollTo(content.y - dy * 0.7));
-      this.input.on('pointerdown', (p) => { this.dy = p.y; this.dragMoved = false; });
-      this.input.on('pointermove', (p) => { if (p.isDown && this.dy !== undefined && Math.abs(p.y - this.dy) > 4) { this.dragMoved = true; scrollTo(content.y + p.y - this.dy); this.dy = p.y; } });
+      this.input.on('pointerdown', (p) => { this.dy = p.worldY; this.dragMoved = false; });
+      this.input.on('pointermove', (p) => { if (p.isDown && this.dy !== undefined && Math.abs(p.worldY - this.dy) > 4) { this.dragMoved = true; scrollTo(content.y + p.worldY - this.dy); this.dy = p.worldY; } });
       this.input.on('pointerup', () => { this.dy = undefined; });
       const mask = this.make.graphics({ add: false }); mask.fillRect(0, 110, 1280, 530);
       content.setMask(mask.createGeometryMask());
@@ -5942,10 +5942,10 @@
       });
       // Scroll (rueda y arrastre, como el Mazo)
       this.input.on('wheel', (p, o, dx, dy) => { if (!this.detail) this.scrollTo(this.content.y - dy * 0.7); });
-      this.input.on('pointerdown', (p) => { this.dy = p.y; this.dragMoved = false; });
+      this.input.on('pointerdown', (p) => { this.dy = p.worldY; this.dragMoved = false; });
       this.input.on('pointermove', (p) => {
         if (this.detail || !p.isDown || this.dy === undefined) return;
-        if (Math.abs(p.y - this.dy) > 4) { this.dragMoved = true; this.scrollTo(this.content.y + p.y - this.dy); this.dy = p.y; }
+        if (Math.abs(p.worldY - this.dy) > 4) { this.dragMoved = true; this.scrollTo(this.content.y + p.worldY - this.dy); this.dy = p.worldY; }
       });
       this.input.on('pointerup', () => { this.dy = undefined; });
       this.renderTab();
@@ -6288,7 +6288,7 @@
       g.lineStyle(2, C.gold, 0.9); g.strokeRoundedRect(px, py, PW, PH, 16);
       layer.add([blocker, dim, g]);
       const close = () => { layer.destroy(); this.detail = null; };
-      blocker.on('pointerup', (p) => { if (p.x < px || p.x > px + PW || p.y < py || p.y > py + PH) close(); });
+      blocker.on('pointerup', (p) => { if (p.worldX < px || p.worldX > px + PW || p.worldY < py || p.worldY > py + PH) close(); });
       layer.add(button(this, px + PW - 70, py + PH - 36, _t('s.cerrar'), close, { w: 120, h: 38, size: 18, variant: 'ghost' }));
       const RX = 560;   // columna de texto
       const line = (y, str, o = {}) => { const t = T(this, RX, y, str, { size: 18, ox: 0, oy: 0, color: C.parch, wrap: px + PW - RX - 30, ...o }); layer.add(t); return t; };
@@ -6843,8 +6843,8 @@
       this.minY = Math.min(0, 700 - y);
       this.input.on('wheel', (p, o, dx, dy) => { content.y = Phaser.Math.Clamp(content.y - dy * 0.7, this.minY, 0); });
       let dyStart;
-      this.input.on('pointerdown', (p) => { dyStart = p.y; });
-      this.input.on('pointermove', (p) => { if (p.isDown && dyStart !== undefined) { content.y = Phaser.Math.Clamp(content.y + p.y - dyStart, this.minY, 0); dyStart = p.y; } });
+      this.input.on('pointerdown', (p) => { dyStart = p.worldY; });
+      this.input.on('pointermove', (p) => { if (p.isDown && dyStart !== undefined) { content.y = Phaser.Math.Clamp(content.y + p.worldY - dyStart, this.minY, 0); dyStart = p.worldY; } });
       this.input.on('pointerup', () => { dyStart = undefined; });
       this.input.keyboard.once('keydown-ESC', () => this.scene.start('Title'));
     }
@@ -7113,7 +7113,7 @@
       this.holdRing = this.add.graphics().setDepth(71);
       this.hint = T(this, 1266, 706, _t('intro.hint'), { size: 13, color: C.muted, ox: 1, oy: 1 }).setDepth(70).setAlpha(0.8);
       // Toque / clic: corto = siguiente; mantenido = saltar
-      const onSkipBtn = (p) => p.x > 1100 && p.y < 70;
+      const onSkipBtn = (p) => p.worldX > 1100 && p.worldY < 70;
       this.input.on('pointerdown', (p) => { if (!onSkipBtn(p)) { this.holdAt = this.time.now; this.holdFrom = 'pointer'; } });
       this.input.on('pointerup', (p) => { if (this.holdFrom !== 'pointer') return; const held = this.time.now - this.holdAt; this.holdFrom = null; if (!onSkipBtn(p) && held < INTRO_HOLD) this.next(); });
       // Espacio: igual; Enter = A (siguiente), Esc = B (saltar) llegan por Input

@@ -43,6 +43,7 @@
 <div id="game"><div id="loader">Carticas Mágicas<small>Encendiendo las brasas…</small></div></div>
 
 <script src="vendor/phaser.min.js"></script>
+<script src="src/ui/hires.js"></script>
 <script src="i18n.js"></script>
 <script src="i18n_strings.js"></script>
 <script src="i18n_data_en.js"></script>
@@ -84,8 +85,8 @@
       type: Phaser.AUTO,
       input: { gamepad: true },   // mando (Xbox / API estándar)
       parent: 'game',
-      width: 1280,
-      height: 720,
+      width: window.CM_HIRES.W,    // 1280·R × 720·R píxeles reales; las cámaras hacen zoom R (todo sigue en 1280×720 lógicos)
+      height: window.CM_HIRES.H,
       backgroundColor: window.CM_THEME.css(window.CM_THEME.color.deep),
       scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
       render: { antialias: true },

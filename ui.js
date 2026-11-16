@@ -235,12 +235,13 @@
     try { saved = JSON.parse(Store.get(OPTS_KEY) || 'null'); } catch (e) { saved = null; }
     const sp = saved && [1, 2, 3].includes(saved.speed) ? saved.speed : 1;
     return { speed: sp, endWarn: !(saved && saved.endWarn === false), reduceMotion: !!(saved && saved.reduceMotion),
-      vibration: !(saved && saved.vibration === false) };   // vibración del mando: activada por defecto
+      vibration: !(saved && saved.vibration === false),   // vibración del mando: activada por defecto
+      gfx: saved && ['auto', 'high', 'perf'].includes(saved.gfx) ? saved.gfx : 'auto' };   // calidad gráfica (src/ui/hires.js la lee al arrancar)
   })();
   let optsGame = null;   // se engancha en Sfx.attach
   function setOpt(k, v) {
     Opts[k] = v;
-    Store.set(OPTS_KEY, JSON.stringify({ speed: Opts.speed, endWarn: Opts.endWarn, reduceMotion: Opts.reduceMotion, vibration: Opts.vibration }));
+    Store.set(OPTS_KEY, JSON.stringify({ speed: Opts.speed, endWarn: Opts.endWarn, reduceMotion: Opts.reduceMotion, vibration: Opts.vibration, gfx: Opts.gfx }));
     if (optsGame) optsGame.scene.getScenes(true).forEach((sc) => { if (sc.applyOptions) sc.applyOptions(); });
   }
   /** Siguiente velocidad (tecla V): 1 → 2 → 3 → 1. */
@@ -929,20 +930,20 @@
     const g = scene.make.graphics({ x: 0, y: 0, add: false });
     for (const [k, fn] of Object.entries(ICONS)) {
       if (scene.textures.exists('ic_' + k)) continue;   // hay PNG real (assets/icons): el procedural queda de respaldo
-      g.clear(); fn(g); g.generateTexture('ic_' + k, ICON_BASE, ICON_BASE);
+      g.clear(); fn(g); root.CM_HIRES.genTex(g, 'ic_' + k, ICON_BASE, ICON_BASE);
     }
     // Arte procedural solo para las claves que no tengan imagen real cargada en Boot.preload()
     for (const [k, a] of Object.entries(ART)) {
       if (scene.textures.exists('art_' + k)) continue;
-      g.clear(); a.draw(g); g.generateTexture('art_' + k, a.w, a.h);
+      g.clear(); a.draw(g); root.CM_HIRES.genTex(g, 'art_' + k, a.w, a.h);
     }
     // Partícula suave y reverso de carta
-    g.clear(); g.fillStyle(0xffffff, 1); g.fillCircle(8, 8, 8); g.generateTexture('dot', 16, 16);
+    g.clear(); g.fillStyle(0xffffff, 1); g.fillCircle(8, 8, 8); root.CM_HIRES.genTex(g, 'dot', 16, 16);
     g.clear();
     g.fillStyle(0x1c2b3f, 1); g.fillRoundedRect(0, 0, 72, 100, 8);
     g.lineStyle(3, C.gold, 1); g.strokeRoundedRect(3, 3, 66, 94, 6);
     star(g, 36, 50, 18, 6, 4, C.gold);
-    g.generateTexture('cardback', 72, 100);
+    root.CM_HIRES.genTex(g, 'cardback', 72, 100);   // a R× (nítido), con tamaño lógico 72×100
     g.destroy();
     makeSoftTextures(scene);
   }
@@ -1361,7 +1362,8 @@
   /** Huecos de cada marco en proporción 0-1 (assets/frames/ventanas.json): [ilustración, texto], cada uno [x0, y0, x1, y1]. */
   const FRAME_WIN = { criomante: [[0.142, 0.113, 0.858, 0.605], [0.142, 0.641, 0.858, 0.859]], electromante: [[0.149, 0.118, 0.851, 0.589], [0.149, 0.637, 0.85, 0.86]], guardiana: [[0.144, 0.117, 0.855, 0.592], [0.146, 0.64, 0.853, 0.864]], invocadora: [[0.139, 0.115, 0.86, 0.592], [0.143, 0.637, 0.855, 0.861]], neutral: [[0.132, 0.116, 0.867, 0.583], [0.14, 0.632, 0.86, 0.852]], paladin: [[0.145, 0.115, 0.854, 0.581], [0.152, 0.632, 0.847, 0.864]], piromago: [[0.133, 0.125, 0.867, 0.613], [0.139, 0.658, 0.86, 0.878]] };
   const FRAME_IDS = Object.keys(FRAME_WIN);
-  const CARD_RES = 2;   // la textura base se pinta al doble: nítida al pasar el ratón (×1,3) y en el detalle del compendio (×1,45)
+  // La textura base se pinta a R×1,3 (mín. 2, máx. 3): nítida a la resolución real, también al pasar el ratón (×1,3)
+  const CARD_RES = Math.min(3, Math.max(2, Math.ceil(root.CM_HIRES.R * 1.3 * 4) / 4));
   /** Marco de una carta: el de su personaje; neutrales, «cualquiera» y maldiciones, el neutral. */
   const frameOf = (def) => (FRAME_WIN[def.class] ? def.class : 'neutral');
   /** Huecos en píxeles locales de la carta (origen en el centro). */
@@ -1440,7 +1442,7 @@
    * Carta estática (compendio, listas): se pinta UNA vez en una RenderTexture y se guarda como textura ('cs_…');
    * las siguientes veces es una sola imagen (scroll fluido con cientos de cartas). Sin combate ni cosméticos.
    */
-  const SNAP_RES = 1.5;
+  const SNAP_RES = Math.max(1.5, root.CM_HIRES.R);   // instantánea de carta a la resolución real (mín. 1,5 como antes)
   function cardSnapshot(scene, card, scale = 0.6) {
     const key = `cs_${card.id}_${card.up ? 1 : 0}_${I18N.lang}_${scale}`;
     const w = Math.ceil((CARD_W + 10) * scale * SNAP_RES), h = Math.ceil((CARD_H + 14) * scale * SNAP_RES);
@@ -2152,7 +2154,7 @@
     g.lineStyle(3, col, 1); g.strokeRoundedRect(3, 3, 66, 94, 6);
     g.lineStyle(1, col, 0.5); g.strokeRoundedRect(9, 9, 54, 82, 4);
     star(g, 36, 50, 18, 6, back === 'scroll' ? 6 : 4, col);
-    g.generateTexture(key, 72, 100);
+    root.CM_HIRES.genTex(g, key, 72, 100);
     g.destroy();
     return key;
   }
@@ -2391,7 +2393,7 @@
       if (E.discardPotion(run, slot)) { Sfx.play('ice_shatter', { volume: 0.35 }); saveRun(run); hudApi.refresh(); }
     }, { w: W - 24, h: 28, size: 14, variant: 'ghost', font: 'body' });
     layer.add(toss);
-    blocker.on('pointerup', (p) => { if (p.x < px || p.x > px + W || p.y < py || p.y > py + H) close(); });
+    blocker.on('pointerup', (p) => { if (p.worldX < px || p.worldX > px + W || p.worldY < py || p.worldY > py + H) close(); });
     scene._potionMenu = { close };
     scene.events.once('shutdown', () => { scene._potionMenu = null; });
   }
@@ -2524,7 +2526,7 @@
     const ring = S.add.graphics(); layer.add(ring);
     const paint = () => { ring.clear(); if (Input.device === 'mouse') return; const b = btns[sel]; ring.lineStyle(3, C.gold, 1); ring.strokeRoundedRect(b.x - W / 2 + 10, b.y - 23, W - 20, 46, 10); };
     paint();
-    blocker.on('pointerup', (p) => { if (p.x < px || p.x > px + W || p.y < py || p.y > py + H) close(); });
+    blocker.on('pointerup', (p) => { if (p.worldX < px || p.worldX > px + W || p.worldY < py || p.worldY > py + H) close(); });
     const api = { close, nav(a) {
       if (a === 'up' || a === 'down') { sel = (sel + (a === 'up' ? -1 : 1) + btns.length) % btns.length; paint(); }
       else if (a === 'confirm') btns[sel].press();
@@ -2548,14 +2550,14 @@
     if (scene._settingsOpen) return;
     scene._settingsOpen = true;
     const S = Overlay.S(scene);   // estado en la escena dueña (teclado y mando); dibujo en el Overlay
-    const PW = 560, PH = 676, px = 640 - PW / 2, py = 360 - PH / 2;
+    const PW = 560, PH = 700, px = 640 - PW / 2, py = 360 - PH / 2;
     const layer = S.add.container(0, 0).setDepth(LAYER.modal).setScrollFactor(0);
     const blocker = S.add.zone(0, 0, 1280, 720).setOrigin(0, 0).setInteractive();
     const dim = S.add.rectangle(640, 360, 1280, 720, TH.color.shade, TH.alpha.curtain);
     const g = S.add.graphics();
     g.fillStyle(TH.color.shade, TH.alpha.shadow); g.fillRoundedRect(px + 4, py + 8, PW, PH, TH.radius);
     root.CM_Panel.draw(g, px, py, PW, PH);
-    const title = T(S, 640, py + 42, _t('u.ajustes'), { size: TH.size.h2, bold: true, color: C.gold });
+    const title = T(S, 640, py + 38, _t('u.ajustes'), { size: TH.size.h2, bold: true, color: C.gold });
     layer.add([blocker, dim, g, title]);
     Overlay.own(scene, layer); Overlay.addModal(layer);
     const handlers = [];
@@ -2579,8 +2581,8 @@
       };
       const fromX = (x) => Math.round(Math.min(1, Math.max(0, (x - x0) / len)) * 10) / 10;
       const update = (x) => { const nv = fromX(x); if (nv !== v) { v = nv; set(v); draw(); if (onStep) onStep(v); } };
-      hit.on('pointerdown', (p) => { dragging = true; update(p.x); });
-      const move = (p) => { if (dragging && p.isDown) update(p.x); };
+      hit.on('pointerdown', (p) => { dragging = true; update(p.worldX); });
+      const move = (p) => { if (dragging && p.isDown) update(p.worldX); };
       const up = () => { dragging = false; };
       S.input.on('pointermove', move); S.input.on('pointerup', up);
       handlers.push(['pointermove', move], ['pointerup', up]);
@@ -2588,14 +2590,14 @@
       layer.add([lbl, track, thumb, pct, hit]);
       return { y, adjust: (d) => { const nv = Math.round(Math.min(1, Math.max(0, v + d * 0.1)) * 10) / 10; if (nv !== v) { v = nv; set(v); draw(); if (onStep) onStep(v); } } };
     };
-    const sMusic = slider(py + 98, _t('u.musica'), () => Vol.music, (v) => Music.setVolume(v));
+    const sMusic = slider(py + 96, _t('u.musica'), () => Vol.music, (v) => Music.setVolume(v));
     // Efectos: clic de prueba al moverla (ya con el volumen nuevo; con 0% no suena)
-    const sSfx = slider(py + 148, _t('u.efectos'), () => Vol.sfx, (v) => Sfx.setSfxVolume(v), () => { Sfx.unlock(); Sfx.synth('click', 1.6); });
+    const sSfx = slider(py + 140, _t('u.efectos'), () => Vol.sfx, (v) => Sfx.setSfxVolume(v), () => { Sfx.unlock(); Sfx.synth('click', 1.6); });
     // Voz (Parche 3.7): la narración de la intro, si tiene audios
-    const sVoice = slider(py + 198, _t('u.voz'), () => Vol.voice, (v) => { Vol.voice = Vol.clamp(v, Vol.voice); saveVol(); });
+    const sVoice = slider(py + 184, _t('u.voz'), () => Vol.voice, (v) => { Vol.voice = Vol.clamp(v, Vol.voice); saveVol(); });
 
     // Velocidad de animación del combate: ×1 / ×2 / ×3 (tecla V en combate)
-    const sy = py + 250;
+    const sy = py + 232;
     layer.add(fitLine(T(S, px + 40, sy, _t('u.velocidad_de_animacion'), { size: TH.size.body, ox: 0, color: C.parch }), 250));
     const speedBtns = [1, 2, 3].map((v, i) => {
       const b = button(S, px + 330 + i * 72, sy, `×${v}`, () => { setOpt('speed', v); paintSpeed(); Sfx.synth('click', 1.4); },
@@ -2609,6 +2611,25 @@
     };
     paintSpeed();
     layer.add(fitText(T(S, px + 40, sy + 22, _t('u.tweens_esperas_y_efectos_del'), { size: TH.size.micro, ox: 0, oy: 0, color: C.muted, wrap: 250, lineSpacing: -3 }), 250, 36, TH.size.micro));
+
+    // Calidad gráfica (src/ui/hires.js): Automática (R según la pantalla) · Alta (R = 2) · Rendimiento (R = 1, como antes).
+    // Cambia la resolución del lienzo: se aplica al reiniciar el juego.
+    const qy = py + 304, Hi = root.CM_HIRES, GFX = ['auto', 'high', 'perf'];
+    layer.add(fitLine(T(S, px + 40, qy - 6, _t('gfx.title'), { size: TH.size.body, ox: 0, color: C.parch }), 300, TH.size.small));
+    const gfxHint = T(S, px + 40, qy + 16, '', { size: TH.size.micro, ox: 0, color: C.muted });
+    const gfxBtn = button(S, px + PW - 120, qy, _t('gfx.' + Opts.gfx), () => cycleGfx(1), { w: 170, h: TH.button.minH, size: TH.size.small, variant: 'ghost', compact: false });
+    const paintGfx = () => {
+      const pending = Opts.gfx !== Hi.mode;
+      gfxHint.setText(pending ? _t('gfx.restart') : _t('gfx.now', { r: I18N.mult(Hi.R) })).setColor(hex(pending ? C.ember : C.muted));
+      fitLine(gfxHint, 300, TH.size.micro);
+      gfxBtn.setLabel(_t('gfx.' + Opts.gfx));
+    };
+    const cycleGfx = (d) => {
+      const v = GFX[(GFX.indexOf(Opts.gfx) + (d < 0 ? GFX.length - 1 : 1)) % GFX.length];
+      setOpt('gfx', v); paintGfx(); Sfx.synth('click', 1.4);   // el aviso «se aplica al reiniciar» queda bajo la etiqueta (en ember)
+    };
+    layer.add([gfxHint, gfxBtn]);
+    paintGfx();
 
     // Casillas: aviso al terminar el turno con energía y «Reducir movimiento» (sin temblores ni destellos)
     const checkbox = (wy, label, key) => {
@@ -2626,28 +2647,28 @@
       paintChk(); layer.add(chkHit);
       return { y: wy, toggle };
     };
-    const cWarn = checkbox(py + 318, _t('u.avisar_si_terminas_el_turno'), 'endWarn');
-    const cMotion = checkbox(py + 362, _t('u.reducir_movimiento_sin_temblores_ni'), 'reduceMotion');
-    const cVib = checkbox(py + 406, _t('feel.vibration'), 'vibration');   // vibración del mando (golpes fuertes, daño, jefe)
+    const cWarn = checkbox(py + 356, _t('u.avisar_si_terminas_el_turno'), 'endWarn');
+    const cMotion = checkbox(py + 398, _t('u.reducir_movimiento_sin_temblores_ni'), 'reduceMotion');
+    const cVib = checkbox(py + 440, _t('feel.vibration'), 'vibration');   // vibración del mando (golpes fuertes, daño, jefe)
     // Idioma / Language: botón con el idioma actual que abre el menú
-    const ly = py + 450;
+    const ly = py + 484;
     layer.add(fitLine(T(S, px + 40, ly, _t('lang.title'), { size: TH.size.body, ox: 0, color: C.parch }), 300, TH.size.small));
     const langBtn = button(S, px + PW - 120, ly, I18N.LANG_NAMES[I18N.lang], () => openLangMenu(scene, px + PW - 120, ly + 26), { w: 170, h: TH.button.minH, size: TH.size.small, variant: 'ghost', compact: false });
     layer.add(langBtn);
     // Glosario de habilidades (pestaña «Habilidades» del Compendio, encima de esta pantalla)
-    const gy = py + 494;
+    const gy = py + 528;
     const openGl = () => { close(); const UI = root.CM_UI; if (UI && UI.openGlossary) UI.openGlossary(scene); };
     layer.add(fitLine(T(S, px + 40, gy, _t('gl.open'), { size: TH.size.body, ox: 0, color: C.parch }), 300, TH.size.small));
     const glBtn = button(S, px + PW - 120, gy, _t('gl.openBtn'), openGl, { w: 170, h: TH.button.minH, size: TH.size.small, variant: 'ghost', compact: false });
     layer.add(glBtn);
     // Ver la intro (Parche 3.7): encima de la escena actual, que queda en pausa
-    const iy = py + 538;
+    const iy = py + 572;
     const openIntro = () => { close(); const sc = scene; sc.scene.launch('Intro', { over: sc.scene.key }); sc.scene.pause(sc.scene.key); };
     layer.add(fitLine(T(S, px + 40, iy, _t('intro.watchLong'), { size: TH.size.body, ox: 0, color: C.parch }), 300, TH.size.small));
     const inBtn = button(S, px + PW - 120, iy, _t('intro.watch'), openIntro, { w: 170, h: TH.button.minH, size: TH.size.small, variant: 'ghost', compact: false });
     layer.add(inBtn);
     // Progreso: exportar / importar (copia en texto para llevarla a otro dispositivo)
-    const pgy = py + 582;
+    const pgy = py + 616;
     const openExp = () => openProgress(scene, 'export'), openImp = () => openProgress(scene, 'import');
     layer.add(fitLine(T(S, px + 40, pgy, _t('sv.section'), { size: TH.size.body, ox: 0, color: C.parch }), 220, TH.size.small));
     const pgBtns = [[_t('sv.export'), openExp], [_t('sv.import'), openImp]].map(([lab, fn], i) => {
@@ -2683,14 +2704,14 @@
       if (S.input.keyboard) S.input.keyboard.off('keydown', onKey);
       layer.destroy();
     };
-    const closeBtn = button(S, 640, py + PH - 38, _t('u.cerrar'), close, { w: 160, h: TH.button.minH, size: TH.size.body, variant: 'gold', compact: false, role: 'back' });
+    const closeBtn = button(S, 640, py + PH - 34, _t('u.cerrar'), close, { w: 160, h: TH.button.minH, size: TH.size.body, variant: 'gold', compact: false, role: 'back' });
     layer.add(closeBtn);
     scene._settingsClose = close;   // el mando (B) también lo cierra
     // Mando / flechas: ↑/↓ entre opciones, ←/→ mueven las barras y la velocidad, A marca/cierra
     const setSpeed = (d) => { const v = Math.max(1, Math.min(3, Opts.speed + d)); if (v !== Opts.speed) { setOpt('speed', v); paintSpeed(); Sfx.synth('click', 1.4); } };
     const rows = [
-      { y: sMusic.y, lr: sMusic.adjust }, { y: sSfx.y, lr: sSfx.adjust }, { y: sVoice.y, lr: sVoice.adjust }, { y: sy, lr: setSpeed },
-      { y: cWarn.y, ok: cWarn.toggle }, { y: cMotion.y, ok: cMotion.toggle }, { y: cVib.y, ok: () => { cVib.toggle(); if (Opts.vibration) vibrate(0.5, 120); } }, { y: ly, ok: () => openLangMenu(scene, px + PW - 120, ly + 26) }, { y: gy, ok: openGl }, { y: iy, ok: openIntro }, { y: pgy, ok: () => (pgSel ? openImp : openExp)(), lr: (d) => { pgSel = d > 0 ? 1 : 0; }, pair: pgBtns }, { y: py + PH - 38, ok: close, btn: true }
+      { y: sMusic.y, lr: sMusic.adjust }, { y: sSfx.y, lr: sSfx.adjust }, { y: sVoice.y, lr: sVoice.adjust }, { y: sy, lr: setSpeed }, { y: qy, ok: () => cycleGfx(1), lr: cycleGfx },
+      { y: cWarn.y, ok: cWarn.toggle }, { y: cMotion.y, ok: cMotion.toggle }, { y: cVib.y, ok: () => { cVib.toggle(); if (Opts.vibration) vibrate(0.5, 120); } }, { y: ly, ok: () => openLangMenu(scene, px + PW - 120, ly + 26) }, { y: gy, ok: openGl }, { y: iy, ok: openIntro }, { y: pgy, ok: () => (pgSel ? openImp : openExp)(), lr: (d) => { pgSel = d > 0 ? 1 : 0; }, pair: pgBtns }, { y: py + PH - 34, ok: close, btn: true }
     ];
     let row = rows.length - 1;
     const ring = S.add.graphics(); layer.add(ring);
@@ -2716,7 +2737,7 @@
       if (scene._settingsOpen && layer.scene) paintRow();   // (si la acción abrió otro panel, este ya no existe)
       return true;
     };
-    blocker.on('pointerup', (p) => { if (p.x < px || p.x > px + PW || p.y < py || p.y > py + PH) close(); });   // clic fuera = cerrar
+    blocker.on('pointerup', (p) => { if (p.worldX < px || p.worldX > px + PW || p.worldY < py || p.worldY > py + PH) close(); });   // clic fuera = cerrar
     const onKey = (ev) => {
       if (ev.key === 'Escape' && keysLayer.visible) { showKeys(false); return; }
       if (ev.key === 'Escape' || ev.key === 'Enter') S.time.delayedCall(0, close);
@@ -2978,7 +2999,7 @@
     if (S.input.keyboard) S.input.keyboard.on('keydown', onKey);
     scene._settingsNav = nav;
     scene._settingsClose = () => close(false);
-    blocker.on('pointerup', (p) => { if (!api.busy && (p.x < px || p.x > px + PW || p.y < py || p.y > py + PH)) close(true); });
+    blocker.on('pointerup', (p) => { if (!api.busy && (p.worldX < px || p.worldX > px + PW || p.worldY < py || p.worldY > py + PH)) close(true); });
     scene.events.once('shutdown', () => { if (!closed) { closed = true; Object.values(tas).forEach((t) => t && t.destroy()); scene._settingsOpen = false; scene._progress = null; } });
     Object.assign(api, { close, check, copy, download, pickFile, accept, nav, go, textarea: (k) => tas[k] && tas[k].el, buttons: () => btns, layer });
     scene._progress = api;

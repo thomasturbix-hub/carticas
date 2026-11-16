@@ -222,7 +222,7 @@
     const base = layers.map((l) => ({ x: l.x, y: l.y }));
     layers.forEach((l) => { if (l.setDisplaySize && l.displayWidth) l.setDisplaySize(l.displayWidth + amp * 4, l.displayHeight + amp * 4); });
     let tx = 0, ty = 0, cx = 0, cy = 0;
-    const move = (p) => { tx = -((p.x - 640) / 640) * amp; ty = -((p.y - 360) / 360) * amp * 0.6; };
+    const move = (p) => { tx = -((p.worldX - 640) / 640) * amp; ty = -((p.worldY - 360) / 360) * amp * 0.6; };
     const upd = () => {
       cx += (tx - cx) * 0.08; cy += (ty - cy) * 0.08;
       layers.forEach((l, i) => { l.x = base[i].x + cx; l.y = base[i].y + cy; });
@@ -240,8 +240,8 @@
     const cam = scene.cameras.main;
     if (!rm()) {
       tws.timeScale = base * 0.35;   // cámara lenta (los tweens del resto de la escena)
-      cam.zoomTo(1.06, 260 / sp(), 'Quad.easeOut');   // (la cámara solo entiende los nombres largos de easing)
-      cam.pan(640 + (sprite.x - 640) * 0.08, 350, 260 / sp(), 'Quad.easeOut');   // un pelín hacia el jefe (con zoom 1,06 nunca se ve fuera del lienzo)
+      // zoom ×1,06 sobre la base R y un pelín hacia el jefe (con zoom 1,06 nunca se ve fuera del lienzo)
+      root.CM_HIRES.camTo(cam, { f: 1.06, x: 640 + (sprite.x - 640) * 0.08, y: 350, duration: 260 / sp(), ease: 'Quad.easeOut' });
       bloom(scene, 1.1, 900);
       scene.shake && scene.shake(500, 0.008);
     }
@@ -261,7 +261,7 @@
       tws.add({ targets: t, alpha: 1, scale: s1, duration: 320, ease: 'Back.out', onComplete: res });
     });
     await new Promise((res) => scene.time.delayedCall(800, res));
-    if (!rm()) { cam.zoomTo(1, 300 / sp(), 'Quad.easeInOut'); cam.pan(640, 360, 300 / sp(), 'Quad.easeInOut'); }
+    if (!rm()) root.CM_HIRES.camReset(cam, 300 / sp(), 'Quad.easeInOut');   // vuelve a zoom R, centro 640×360
     tws.add({ targets: [bg, t], alpha: 0, duration: 220, onComplete: () => { bg.destroy(); t.destroy(); } });
   }
 

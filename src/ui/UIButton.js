@@ -32,7 +32,7 @@
     g.fillRoundedRect(b / 2, b / 2, TEX - b, TEX - b, TH.radius);
     g.lineStyle(b, v.line, v.la);
     g.strokeRoundedRect(b / 2, b / 2, TEX - b, TEX - b, TH.radius);
-    g.generateTexture(key, TEX, TEX);
+    root.CM_HIRES.genTex(g, key, TEX, TEX);   // a R×, con tamaño lógico 48×48 (NineSlice nítido)
     g.destroy();
     return key;
   }

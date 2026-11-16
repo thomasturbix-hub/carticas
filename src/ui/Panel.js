@@ -18,7 +18,7 @@
     const g = scene.make.graphics({ x: 0, y: 0, add: false }), b = TH.borderWidth;
     g.fillStyle(raised ? C.surfaceRaised : C.surface, 1); g.fillRoundedRect(b / 2, b / 2, TEX - b, TEX - b, TH.radius);
     g.lineStyle(b, C.gold, TH.alpha.borderPanel); g.strokeRoundedRect(b / 2, b / 2, TEX - b, TEX - b, TH.radius);
-    g.generateTexture(key, TEX, TEX); g.destroy();
+    root.CM_HIRES.genTex(g, key, TEX, TEX); g.destroy();   // a R×, con tamaño lógico 48×48 (NineSlice nítido)
     return key;
   }
   /** Dibuja el panel sobre un Graphics existente. */
